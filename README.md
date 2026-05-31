@@ -1,7 +1,7 @@
 # mesh-mind-meld
 
 [![pages](https://img.shields.io/badge/live-baditaflorin.github.io%2Fmesh-mind-meld-ffaa00)](https://baditaflorin.github.io/mesh-mind-meld/)
-[![version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/baditaflorin/mesh-mind-meld/blob/main/package.json)
+[![version](https://img.shields.io/badge/version-0.1.1-blue)](https://github.com/baditaflorin/mesh-mind-meld/blob/main/package.json)
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
 > Pairs type a word in a category; match wins; mismatch becomes the new category.
