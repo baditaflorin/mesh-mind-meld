@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ConfettiLayer,
   useConfetti,
@@ -8,6 +8,7 @@ import {
   useNamedPeer,
   usePerPeerValue,
   usePhase,
+  useRoster,
   type MeshConfig,
   type YRoom,
 } from "@baditaflorin/mesh-common";
@@ -30,7 +31,11 @@ export function Feature({ room, config }: Props) {
 
 function Body({ room, config }: { room: YRoom; config: MeshConfig }) {
   const { name, setName, nameOf } = useNamedPeer(config, room);
-  const fair = useFairRng(room, "meld-salts");
+  const roster = useRoster(room);
+  const fair = useFairRng(room, "meld-salts", {
+    peerIds: roster.present,
+    minContributors: 1,
+  });
   const ph = usePhase<Phase>(room, "phase", "lobby");
   const submissions = usePerPeerValue<string>(room, "submissions", "");
   const wins = usePerPeerValue<number>(room, "wins", 0);
@@ -39,6 +44,10 @@ function Body({ room, config }: { room: YRoom; config: MeshConfig }) {
   const flash = useFlashOnChange(ph.phase);
 
   const state = room.doc.getMap<string | number>("state");
+  const subMap = room.doc.getMap<string>("submissions");
+  const winsMap = room.doc.getMap<number>("wins");
+  const transitionRef = useRef(ph.transition);
+  transitionRef.current = ph.transition;
   const [, bump] = useState(0);
   useEffect(() => {
     const cb = () => bump((n) => n + 1);
@@ -53,7 +62,6 @@ function Body({ room, config }: { room: YRoom; config: MeshConfig }) {
   const mySub = submissions.valueOf(room.peerId) ?? "";
   const aWord = pairA ? (submissions.valueOf(pairA) ?? "") : "";
   const bWord = pairB ? (submissions.valueOf(pairB) ?? "") : "";
-  const subMap = room.doc.getMap<string>("submissions");
 
   const start = () => {
     const namesMap = room.doc.getMap<string>("__mesh_names");
@@ -79,9 +87,9 @@ function Body({ room, config }: { room: YRoom; config: MeshConfig }) {
 
   useEffect(() => {
     if (ph.phase !== "meld" || !pairA || !pairB) return;
-    if (submissions.valueOf(pairA) && submissions.valueOf(pairB))
-      ph.transition("reveal", { from: "meld" });
-  }, [ph, submissions, pairA, pairB]);
+    if (aWord && bWord)
+      transitionRef.current("reveal", { from: "meld" });
+  }, [ph.phase, subMap, pairA, pairB, aWord, bWord]);
 
   const matched =
     ph.phase === "reveal" &&
@@ -93,12 +101,11 @@ function Body({ room, config }: { room: YRoom; config: MeshConfig }) {
     if (ph.phase !== "reveal") return;
     if (matched) {
       if (room.peerId === pairA) {
-        const wm = room.doc.getMap<number>("wins");
-        if (pairA) wm.set(pairA, (wins.valueOf(pairA) ?? 0) + 1);
-        if (pairB) wm.set(pairB, (wins.valueOf(pairB) ?? 0) + 1);
+        if (pairA) winsMap.set(pairA, (winsMap.get(pairA) ?? 0) + 1);
+        if (pairB) winsMap.set(pairB, (winsMap.get(pairB) ?? 0) + 1);
       }
       burst({ origin: "top", count: 80, hueRange: [40, 80] });
-      const t = setTimeout(() => ph.transition("won", { from: "reveal" }), 800);
+      const t = setTimeout(() => transitionRef.current("won", { from: "reveal" }), 800);
       return () => clearTimeout(t);
     }
     const t = setTimeout(() => {
@@ -108,10 +115,10 @@ function Body({ room, config }: { room: YRoom; config: MeshConfig }) {
         state.set("round", round + 1);
         [pairA, pairB].forEach((p) => p && subMap.delete(p));
       });
-      ph.transition("meld", { from: "reveal" });
+      transitionRef.current("meld", { from: "reveal" });
     }, 2000);
     return () => clearTimeout(t);
-  }, [ph.phase, matched, aWord, bWord, pairA, pairB, room, state, round, wins, burst, ph, subMap]);
+  }, [ph.phase, matched, aWord, bWord, pairA, pairB, room, state, round, winsMap, burst, subMap]);
 
   const trimmed = name.trim();
   const partnerId = room.peerId === pairA ? pairB : pairA;
